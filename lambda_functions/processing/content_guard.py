@@ -83,6 +83,39 @@ def build_content_facts(
     }
 
 
+# Prompt-example fingerprints. The 2026-08-29 production description closed on
+# "Prochaine étape : la séance mix Force + Allure 42km !", copied verbatim from the
+# sparse-input example of the content prompt: few-shot examples leak. These strings
+# exist ONLY in the prompt's examples (past or present), so their presence in an
+# output is proof of a leak. Checked deterministically because the prompt rule alone
+# is advisory -- the leak IS the model ignoring the prompt's own framing.
+_PROMPT_EXAMPLE_MARKERS = (
+    "force + allure 42",
+    "un escargot mettrait 6 jours",
+)
+
+
+def _check_prompt_example_leak(
+    content: Dict[str, Any],
+    fields: Tuple[str, ...] = CONTENT_CHECKED_FIELDS,
+) -> List[str]:
+    """Flag output text copied verbatim from the prompt's few-shot examples."""
+    problems: List[str] = []
+    for field in fields:
+        text = content.get(field)
+        if not isinstance(text, str) or not text:
+            continue
+        low = text.lower()
+        for marker in _PROMPT_EXAMPLE_MARKERS:
+            if marker in low:
+                problems.append(
+                    f"{field}: prompt example leaked verbatim ('{marker}') -- "
+                    "this names no real session, rewrite the closing from the "
+                    "actual Campus plan or stay generic"
+                )
+    return problems
+
+
 def verify_content(
     content: Optional[Dict[str, Any]],
     facts: Optional[Dict[str, Any]],
@@ -93,6 +126,7 @@ def verify_content(
         return []
     problems = verify_weekly_claims(content, None, None, facts, CONTENT_CHECKED_FIELDS)
     problems += find_internal_contradictions(content, activity_date, CONTENT_CHECKED_FIELDS)
+    problems += _check_prompt_example_leak(content)
     return problems
 
 
