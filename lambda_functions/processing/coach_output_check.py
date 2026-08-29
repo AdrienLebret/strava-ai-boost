@@ -81,6 +81,28 @@ _COMPARE_SPLIT = re.compile(
 # "km·h") rather than any slash, so "21,8km / 3 runs" -- a slash used as a separator --
 # is still read as a distance.
 _KM = re.compile(rf"{_NUM}\s*km\b(?!\s*[/·]\s*h)", re.IGNORECASE)
+
+# Claim boundaries INSIDE a comparison segment: ", " / " — " / " ; " / spaced hyphen.
+# A decimal comma ("15,6km") has no following space, so it never splits. Production
+# case 2026-08-24: "Cette semaine : 2 courses (15,6km), 1 séance restante à faire" --
+# the remaining marker of the SECOND claim shielded the FIRST one at sentence level,
+# and a wrong weekly count shipped. Same failure class as the past-week markers
+# documented below, same cure: each claim answers for itself.
+_CLAIM_BOUNDARY = re.compile(r",\s+|\s+[—–]\s+|\s+-\s+|;\s+")
+
+
+def _weekly_claim_subsegments(segment: str):
+    """Split a comparison segment into its claim-carrying clauses.
+
+    The caller applies a FORWARD shield: a clause carrying a remaining marker
+    ("1 séance restante à faire") or a scope disqualifier ("en fin de semaine",
+    past weeks, averages) silences itself and every clause AFTER it, but never
+    what came before. Production case 2026-08-24: both shielding markers lived
+    in the trailing clauses and silenced a wrong leading done-claim.
+    """
+    for sub in _CLAIM_BOUNDARY.split(segment):
+        if sub and sub.strip():
+            yield sub
 # "il te reste 2", "il reste 4 seances"
 _REMAINING = re.compile(rf"il\s+(?:te\s+)?reste\s+{_NUM}", re.IGNORECASE)
 # "320 reps", "238 repetitions"
@@ -273,16 +295,24 @@ def _check_sentence(
         now answers for itself."""
         return bool(_NOT_CURRENT_WEEK.search(seg.lower())) or _mentions_past_week(seg)
 
-    if sentence_week_scope and not counts_incomplete and not _mentions_remaining(sentence):
+    if sentence_week_scope and not counts_incomplete:
         for seg in segments:
-            if _segment_disqualified(seg):
-                continue
-            for m in _RUN_COUNT.finditer(seg):
-                compare("run count this week", _to_float(m.group(1)), done.get("runs"))
-            for m in _KM.finditer(seg):
-                compare("kilometres this week", _to_float(m.group(1)), done.get("run_km"), KM_TOLERANCE)
-            for m in _TOTAL_COUNT.finditer(seg):
-                compare("total sessions this week", _to_float(m.group(1)), done.get("total"))
+            for sub in _weekly_claim_subsegments(seg):
+                # Forward-only shields, both families: a clause that scopes
+                # itself away from this week's DONE totals (remaining work,
+                # "en fin de semaine", past weeks, averages) also silences
+                # every clause after it -- trailing clauses elaborate on it,
+                # never reopen a done-claim. Clauses BEFORE it keep their own
+                # authority: shielding them is how the 2026-08-24 wrong count
+                # shipped.
+                if _mentions_remaining(sub) or _segment_disqualified(sub):
+                    break
+                for m in _RUN_COUNT.finditer(sub):
+                    compare("run count this week", _to_float(m.group(1)), done.get("runs"))
+                for m in _KM.finditer(sub):
+                    compare("kilometres this week", _to_float(m.group(1)), done.get("run_km"), KM_TOLERANCE)
+                for m in _TOTAL_COUNT.finditer(sub):
+                    compare("total sessions this week", _to_float(m.group(1)), done.get("total"))
 
     # A strength-session count is a weekly claim even without the marker: the
     # production lie was "2e seance muscu en 2 jours", which names no week.
