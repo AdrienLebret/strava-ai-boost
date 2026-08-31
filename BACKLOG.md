@@ -39,6 +39,25 @@ Voir [docs/ROADMAP.md](docs/ROADMAP.md) pour la liste complète et datée. Rappe
 
 ## P1 — High
 
+### Dictée tardive perdue — webhook `update` à traiter en merge de description (fix 4 de l'audit 2026-08-29)
+Quand la dictée de l'athlète arrive **après** la fenêtre des 2 minutes (typique après une
+grosse séance : Seuil du 24/08 et Sortie Longue & Active du 29/08, prouvé en base :
+`original_description` = rapport Enduraw seul, zéro texte athlète), la chaîne échoue deux
+fois : (1) l'anti-boucle du webhook **ignore** l'event `update` d'une activité déjà
+`processing`/`completed`, donc le texte n'entre jamais dans le contexte de génération ;
+(2) le `strava_updater` **écrase** ensuite la dictée sur Strava en poussant la description
+générée. Les 3 autres causes de l'audit sont corrigées et déployées (commits `8343d4a`,
+`046ad23`, `62255d5`) ; celle-ci reste ouverte car elle touche le flow webhook.
+Piste : au lieu de skip, traiter l'`update` d'une activité traitée comme un **merge de
+description** (re-fetch, diff contre la version générée poussée, si du texte athlète
+nouveau apparaît → le préserver/ré-injecter, sans redéclencher la génération complète ni
+créer de boucle : le diff contre notre propre output est le garde anti-boucle naturel).
+Attention aux invariants existants : cooldown 1h des activités failed, idempotence du
+pipeline, et le feedback analyzer nocturne qui lit les diffs (ne pas polluer la Memory
+avec nos propres merges). Contournement en attendant : dicter dans la fenêtre des 2 min,
+ou éditer après coup (la boucle nocturne le lit comme feedback mais le texte publié reste
+écrasé jusqu'au merge manuel).
+
 ### verify_token webhook prédictible et absent (durcir avant dépôt public)
 `configure_strava_webhook.sh` fabrique `VERIFY_TOKEN="strava-ai-boost-verify-token-${ENVIRONMENT}"` (littéral, prédictible) et la clé `webhook_verify_token` est **absente** de Secrets Manager, donc `validate_verify_token` échoue en mode ouvert : le GET de validation d'abonnement accepte n'importe quel token. Impact réel faible (ce chemin ne sert qu'à créer un abonnement, ce qui exige déjà client_id + client_secret), mais à corriger **avant** de rendre le dépôt public. Ordre impératif : 1) écrire un `webhook_verify_token` aléatoire dans le secret, 2) faire lire cette valeur par le script au lieu de la fabriquer, 3) seulement ensuite fermer le mode permissif. Détecté 2026-07-27. NB : le vecteur principal (POST anonyme) est déjà fermé par `validate_webhook_origin`.
 
