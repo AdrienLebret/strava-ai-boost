@@ -527,6 +527,94 @@ def _normalize_plain(value: str) -> str:
     return text
 
 
+# ---------------------------------------------------------------------------
+# Next-session recommendation vs the sessions actually remaining
+# ---------------------------------------------------------------------------
+#
+# On 2026-09-03 the published block ended with "Prochaine séance : les 5 fractions
+# au seuil qui t'attendent cette semaine" while campus_remaining held two EF, one
+# Renforcement and the Sortie Longue — no threshold work at all. The threshold
+# session had been done the day BEFORE; its own coach note ("5 fractions au seuil")
+# sat in the historical context and the model recycled it into the future.
+# reconcile_campus_remaining could not help: the DATA was already correct, the
+# error lived purely in the narrative. Only a deterministic check on the output
+# catches that class.
+#
+# Deliberately narrow, abstain-over-guess:
+#   * Only sentences that ANNOUNCE a next session are examined.
+#   * Only INTENSE running types are challenged (seuil, tempo, VMA, fractionné /
+#     intervalles): those are the ones worth recycling from yesterday's note, and
+#     an athlete told to redo yesterday's threshold session is the costly error.
+#     "Prochaine séance : EF" or the athlete's own strength program (Upper A) stay
+#     out of scope — always plausible, and the personal program is not Campus.
+#   * If the sentence ALSO names a session type that IS remaining (e.g. "ta sortie
+#     longue avec ses blocs tempo"), it passes: titles do not carry the interval
+#     content, so the remaining session may legitimately contain the intense work.
+#   * No titles (no plan synced, or week fully done) means abstain: without a plan
+#     the coach legitimately proposes its own next workout, and once the week is
+#     done a "next" can point at next week's plan.
+
+_NEXT_SESSION = re.compile(
+    r"prochaine?s?\s+(?:s[eé]ance|[eé]tape|sortie|session)s?"
+    r"|t'attend(?:ent)?\b"
+    r"|au\s+programme\s+(?:ensuite|suivant)",
+    re.IGNORECASE,
+)
+
+# Canonical session types, matched on the accent-stripped lowercase text. The same
+# table reads the sentence and the remaining titles, so both sides speak the same
+# language. "longue" alone is NOT a marker ("une longue série de fractions" must not
+# waive the check): only the full "sortie longue" counts.
+_SESSION_TYPE_PATTERNS: Tuple[Tuple[str, Any], ...] = (
+    ("seuil", re.compile(r"\bseuils?\b")),
+    ("tempo", re.compile(r"\btempos?\b")),
+    ("vma", re.compile(r"\bvma\b")),
+    ("fractionné", re.compile(r"\bfraction\w*|\bintervalles?\b")),
+    ("endurance fondamentale", re.compile(r"\bendurance\s+fondamentale\b|\bef\b|\bfootings?\b")),
+    ("sortie longue", re.compile(r"\bsortie\s+longue\b")),
+    ("renfo", re.compile(r"\brenfo\w*|\bppg\b")),
+)
+
+# The subset whose absence from the remaining plan is a publishable error.
+_INTENSE_TYPES = frozenset({"seuil", "tempo", "vma", "fractionné"})
+
+
+def _session_types_in(text: str) -> set:
+    plain = _normalize_plain(text)
+    return {name for name, pattern in _SESSION_TYPE_PATTERNS if pattern.search(plain)}
+
+
+def _check_next_session(
+    sentence: str, week_overview: Optional[Dict[str, Any]]
+) -> List[str]:
+    """Flag a next-session announcement whose intense type is not remaining."""
+    if not _NEXT_SESSION.search(sentence):
+        return []
+    overview = week_overview or {}
+    if overview.get("counts_incomplete"):
+        return []
+    remaining = overview.get("campus_remaining") or {}
+    titles = remaining.get("titles")
+    if not isinstance(titles, list) or not titles:
+        return []
+
+    remaining_types: set = set()
+    for title in titles:
+        if isinstance(title, str):
+            remaining_types |= _session_types_in(title)
+
+    stated = _session_types_in(sentence)
+    if stated & remaining_types:
+        return []
+
+    joined = ", ".join(str(t) for t in titles)
+    return [
+        f"next session announces '{kind}' but no remaining session is of that type"
+        f" (remaining: {joined})"
+        for kind in sorted(stated & _INTENSE_TYPES)
+    ]
+
+
 def verify_weekly_claims(
     feedback: Optional[Dict[str, Any]],
     week_overview: Optional[Dict[str, Any]],
@@ -552,6 +640,8 @@ def verify_weekly_claims(
             for problem in _check_sentence(sentence, week_overview, strength_session):
                 problems.append(f"{field}: {problem}")
             for problem in _check_against_facts(sentence, computed_facts):
+                problems.append(f"{field}: {problem}")
+            for problem in _check_next_session(sentence, week_overview):
                 problems.append(f"{field}: {problem}")
     return problems
 
@@ -580,8 +670,10 @@ def strip_false_claims(
             continue
         kept: List[str] = []
         for sentence in split_sentences(text):
-            if _check_sentence(sentence, week_overview, strength_session) or _check_against_facts(
-                sentence, computed_facts
+            if (
+                _check_sentence(sentence, week_overview, strength_session)
+                or _check_against_facts(sentence, computed_facts)
+                or _check_next_session(sentence, week_overview)
             ):
                 removed.append(sentence.strip())
             else:
