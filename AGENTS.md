@@ -26,7 +26,7 @@ Strava AI Boost is a **serverless AWS application** that automatically enhances 
 
 ### Key Statistics
 - **~18,000 LOC** in core components
-- **18 Lambda functions** (API, processing, webhooks, support, voice — role-based packages)
+- **20 Lambda functions** (API, processing, webhooks, support, voice, push — role-based packages)
 - **3 AgentCore Runtimes** — `content_gen`, `strava_ai_boost_coach` (coach), `coach_chat` (agentic conversational coach): 2 agent definitions in `src/agents/` + 1 chat runtime in `src/coach_chat/`, sharing a single AgentCore Memory (`content_gen_mem`, 3 strategies)
 - **8 CDK stacks**
 - **891 tests** (754 backend unit + 84 regression + 53 frontend) + on-demand prompt regression harness (deterministic V1 + managed AgentCore Evaluations V2)
@@ -431,7 +431,7 @@ export AWS_PROFILE=your-aws-profile
 pytest tests/ -v --ignore=tests/unit/
 ```
 
-**Frontend Tests (53 tests, ~4s):**
+**Frontend Tests (59 tests, ~4s):**
 ```bash
 cd frontend && npm test
 ```

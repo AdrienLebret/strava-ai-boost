@@ -125,6 +125,42 @@ The frontend is hosted on CloudFront with Cognito authentication:
 
 **Deployment Modes**: Phase 1 only gives a fully functional system with Bedrock fallback. Phase 1 + 2 adds advanced personalization with AgentCore Memory.
 
+### Web Push notifications (optional, opt-in)
+
+The `StravaAIBoost-Push` stack adds opt-in Web Push: a single neutral notification
+("activity enriched") is sent to a subscribed browser **after** a Strava activity you
+triggered has been updated. It is strictly opt-in and off by default — no proactive
+or recurring pushes.
+
+Enable it:
+
+1. **Build the push layer** (`pywebpush` and its compiled deps). It is a separate layer
+   owned by the Push stack, so the shared layer exported by Core is never replaced:
+   ```bash
+   ./lambda_layer_push/build_layer.sh
+   ```
+2. **Deploy with the trigger on** via CDK context (default is off):
+   ```bash
+   cdk deploy --all --context push_enabled=true --require-approval never
+   ```
+   Without this flag nothing push-related is synthesized (no stack, secret, route or
+   permission). To keep it on for later deploys, add `"push_enabled": true` to the
+   `context` block of `cdk.json`. Optionally set the VAPID contact subject
+   (RFC 8292 `sub`) with `--context vapid_subject=mailto:you@example.com`.
+3. **Seed the VAPID key pair** into Secrets Manager (one-off, after the Push stack
+   exists; the private key is never printed):
+   ```bash
+   python scripts/bootstrap_vapid.py --apply --profile <your-aws-profile> --region us-east-1
+   ```
+4. **Enable notifications in Preferences** on each device you want to receive them.
+   On **iOS**, Web Push only works once the PWA has been **Added to Home Screen**.
+
+Routes (served by `StravaAIBoost-PushApi`, Cognito-protected except the public key):
+`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe`.
+Subscriptions live in `strava-ai-boost-push-subscriptions`; `StravaAIBoost-PushSend`
+delivers and cleans up expired (404/410) endpoints. No health data or metric is ever
+placed in a notification payload.
+
 ---
 
 ## Configuration
@@ -286,7 +322,7 @@ graph TB
         Browser[Web Browser<br/>React 19 PWA]
     end
 
-    subgraph "AWS Infrastructure - 8 CDK Stacks"
+    subgraph "AWS Infrastructure - 9 CDK Stacks"
         subgraph "Frontend Stack"
             CF[CloudFront + S3<br/>Private, OAC]
             Cognito[Cognito User Pool<br/>JWT, no self-signup]
@@ -310,7 +346,7 @@ graph TB
             FB[Feedback Analyzer<br/>Nightly Learning Loop]
         end
 
-        Lambdas[18 Lambda Functions<br/>Role-Based Packages]
+        Lambdas[20 Lambda Functions<br/>Role-Based Packages]
     end
 
     subgraph "Amazon Bedrock AgentCore ⭐"
@@ -361,8 +397,8 @@ graph TB
 
 | Component | Details |
 |-----------|---------|
-| **8 CDK Stacks** | Core, Security, Webhook, Content, VoiceDebrief, API, Feedback, Frontend |
-| **18 Lambda Functions** | API, processing, webhooks, support, voice (in role-based packages) |
+| **9 CDK Stacks** | Core, Security, Webhook, Content, VoiceDebrief, API, Feedback, Frontend, Push |
+| **20 Lambda Functions** | API, processing, webhooks, support, voice, push (in role-based packages) |
 | **Coach chat runtime** | dedicated **AgentCore Runtime** `coach_chat` (FastAPI + Strands, AGUI protocol, 5 tools). Browser POSTs the AG-UI SSE straight to the data plane; **customJWT** auth (Cognito ID token), no SigV4, no proxy |
 | **4 DynamoDB Tables** | `activities` (2 GSIs, TTL), `user_config`, `coaching_sessions`, `weekly_recaps` |
 | **3 AgentCore Runtimes** | `content_gen`, `strava_ai_boost_coach` (coach), `coach_chat` — sharing a single AgentCore Memory (`content_gen_mem`, 3 strategies). Campus Coach uses the direct REST sync Lambda (no agent) |
@@ -531,7 +567,7 @@ pytest tests/regression/ -v
 export AWS_PROFILE=<your-aws-profile>
 pytest tests/ -v --ignore=tests/unit/
 
-# Frontend unit tests (53 tests, ~4s)
+# Frontend unit tests (59 tests, ~4s)
 cd frontend && npm test
 
 # All backend tests
