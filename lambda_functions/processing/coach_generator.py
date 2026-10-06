@@ -326,6 +326,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         matched_session.get("week_date_iso"),
                         matched["match_score"],
                     )
+
+                    # Reconcile the remaining-sessions view with the match.
+                    #
+                    # week_overview['campus_remaining'] is built from DynamoDB
+                    # statuses read BEFORE the content branch (running in
+                    # parallel) marks the matched session done. Without this,
+                    # the same context tells the coach "this activity IS the
+                    # Sortie Longue & Active" AND "remaining: Sortie Longue &
+                    # Active", and the coach faithfully recommends the session
+                    # the athlete just completed (seen in production 2026-08-29).
+                    # The match is authoritative, so the matched session is
+                    # removed from the remaining list in code.
+                    reconcile_campus_remaining(
+                        historical_summary.get("week_overview"), matched_session
+                    )
                 else:
                     logger.info(
                         "No Campus session matched this activity (best=%.2f)",
@@ -1055,6 +1070,38 @@ def build_week_overview(
             "session_names": [s.get("name") or s.get("id", "") for s in sessions],
         }
     return overview
+
+
+def reconcile_campus_remaining(
+    week_overview: Optional[Dict[str, Any]],
+    matched_session: Dict[str, Any],
+) -> bool:
+    """Remove the matched plan session from week_overview['campus_remaining'].
+
+    campus_remaining is built from DynamoDB statuses read BEFORE the content
+    branch (running in parallel) marks the matched session done. Without this
+    reconciliation the same context tells the coach "this activity IS session X"
+    AND "remaining: session X", and the coach recommends the session the athlete
+    just completed (seen in production on 2026-08-29). The deterministic match
+    is authoritative; mutates week_overview in place. Returns True if removed.
+    """
+    if not week_overview:
+        return False
+    rem = week_overview.get("campus_remaining")
+    title = matched_session.get("title", "")
+    if not rem or title not in (rem.get("titles") or []):
+        return False
+    titles = list(rem["titles"])
+    titles.remove(title)
+    rem["titles"] = titles
+    rem["count"] = max(0, rem.get("count", 1) - 1)
+    if matched_session.get("sport") != "ppg":
+        rem["running_count"] = max(0, rem.get("running_count", 1) - 1)
+    logger.info(
+        "Removed matched session '%s' from campus_remaining (stale pre-match statuses)",
+        title,
+    )
+    return True
 
 
 def build_historical_summary(

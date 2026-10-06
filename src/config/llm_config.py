@@ -22,7 +22,7 @@ import os
 # ---------------------------------------------------------------------------
 # The registry. Change models HERE. (Env vars override at deploy/run time.)
 # ---------------------------------------------------------------------------
-DEFAULT_SONNET_MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+DEFAULT_SONNET_MODEL_ID = "global.anthropic.claude-sonnet-5"
 DEFAULT_HAIKU_MODEL_ID = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 SONNET_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", DEFAULT_SONNET_MODEL_ID)

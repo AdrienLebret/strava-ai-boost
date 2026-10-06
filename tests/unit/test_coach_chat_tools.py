@@ -351,9 +351,13 @@ class TestStrengthFiguresComeFromThePipeline:
     """
 
     def _entry(self, **extra):
+        # Relative date: _get_strength_sessions_impl cuts off at now - weeks_back*7
+        # days, so a fixed date silently expires and empties the result (both
+        # tests of this class broke on 2026-09-01 with the original 2026-08-04).
+        recent = (datetime.now(timezone.utc) - timedelta(days=3)).date().isoformat()
         base = {
             "activity_id": "act-1",
-            "date": "2026-08-04",
+            "date": recent,
             "duration_min": 48,
             "parsed_sets": [
                 {"exercise": "Tractions", "sets": 3, "reps": 10, "weight_kg": None,
