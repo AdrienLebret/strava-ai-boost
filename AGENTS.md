@@ -431,7 +431,7 @@ export AWS_PROFILE=your-aws-profile
 pytest tests/ -v --ignore=tests/unit/
 ```
 
-**Frontend Tests (59 tests, ~4s):**
+**Frontend Tests (64 tests, ~4s):**
 ```bash
 cd frontend && npm test
 ```

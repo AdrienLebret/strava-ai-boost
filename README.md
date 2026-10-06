@@ -134,32 +134,42 @@ or recurring pushes.
 
 Enable it:
 
-1. **Build the push layer** (`pywebpush` and its compiled deps). It is a separate layer
-   owned by the Push stack, so the shared layer exported by Core is never replaced:
+1. **Build the push layer** (`pywebpush` and its compiled deps, pinned). It is a
+   separate layer owned by the Push stack, so the shared layer exported by Core is
+   never replaced. Synth fails if this step was skipped:
    ```bash
    ./lambda_layer_push/build_layer.sh
    ```
-2. **Deploy with the trigger on** via CDK context (default is off):
+   `scripts/deploy.sh` runs it for you when `cdk.json` sets `"push_enabled": true`.
+2. **Deploy with the trigger on** via CDK context (default is off). The VAPID contact
+   subject (RFC 8292 `sub`) is **required**: push services reject an empty one.
    ```bash
-   cdk deploy --all --context push_enabled=true --require-approval never
+   cdk deploy --all --context push_enabled=true \
+     --context vapid_subject=mailto:you@example.com --require-approval never
    ```
-   Without this flag nothing push-related is synthesized (no stack, secret, route or
-   permission). To keep it on for later deploys, add `"push_enabled": true` to the
-   `context` block of `cdk.json`. Optionally set the VAPID contact subject
-   (RFC 8292 `sub`) with `--context vapid_subject=mailto:you@example.com`.
-3. **Seed the VAPID key pair** into Secrets Manager (one-off, after the Push stack
-   exists; the private key is never printed):
+   Without `push_enabled` nothing push-related is synthesized (no stack, secret, route
+   or permission). To keep it on for later deploys, put both keys in the `context`
+   block of `cdk.json`.
+3. **Seed the VAPID key pair** (one-off, after the Push stack exists). It stores the
+   pair in Secrets Manager and copies the public key to the SSM parameter
+   `/strava-ai-boost/push/vapid-public-key`; the private key is never printed:
    ```bash
    python scripts/bootstrap_vapid.py --apply --profile <your-aws-profile> --region us-east-1
    ```
-4. **Enable notifications in Preferences** on each device you want to receive them.
+4. **Show the card in the app**: set `"pushEnabled": true` in `frontend/public/config.json`
+   (see `config.json.example`). Without it the Notifications card is not rendered.
+5. **Enable notifications in Preferences** on each device you want to receive them.
    On **iOS**, Web Push only works once the PWA has been **Added to Home Screen**.
 
-Routes (served by `StravaAIBoost-PushApi`, Cognito-protected except the public key):
-`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe`.
-Subscriptions live in `strava-ai-boost-push-subscriptions`; `StravaAIBoost-PushSend`
-delivers and cleans up expired (404/410) endpoints. No health data or metric is ever
-placed in a notification payload.
+Routes (served by `StravaAIBoost-PushApi`, all Cognito-protected):
+`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe`
+(endpoint required: it removes this device only). PushApi reads only the public-key
+parameter; only `StravaAIBoost-PushSend` can read the VAPID secret. Subscriptions live
+in `strava-ai-boost-push-subscriptions`; PushSend delivers and cleans up expired
+(404/410) endpoints. A notification is sent only when Strava was actually updated, and
+a failed dispatch is retried on the next run. No health data or metric is ever placed
+in a notification payload. `scripts/uninstall.sh` removes the Push stack, the VAPID
+secret and the public-key parameter.
 
 ---
 
@@ -567,7 +577,7 @@ pytest tests/regression/ -v
 export AWS_PROFILE=<your-aws-profile>
 pytest tests/ -v --ignore=tests/unit/
 
-# Frontend unit tests (59 tests, ~4s)
+# Frontend unit tests (64 tests, ~4s)
 cd frontend && npm test
 
 # All backend tests
