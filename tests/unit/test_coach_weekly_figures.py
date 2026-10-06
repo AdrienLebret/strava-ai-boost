@@ -60,16 +60,22 @@ class TestWeeklyBreakdownIsIsoWeekNotRolling:
     """The helper must bucket by ISO week, so Monday opens a fresh week."""
 
     def test_monday_activity_opens_a_new_week(self):
+        # Relative to today: the format_weekly_breakdown window is anchored on now().
+        monday = _relative_monday(1)
+
+        def day(offset: int) -> str:
+            return _iso(monday + timedelta(days=offset))
+
         activities = [
-            # W32 opens on Monday 03/08 with a single 6.4km run.
-            {'activity_type': 'Run', 'distance': 6420, 'start_date': '2026-08-03T17:21:26Z'},
-            # W31: 4 runs totalling 26.5km, plus 2 strength sessions.
-            {'activity_type': 'Run', 'distance': 8579, 'start_date': '2026-08-02T08:43:20Z'},
-            {'activity_type': 'Run', 'distance': 6796, 'start_date': '2026-08-01T17:39:17Z'},
-            {'activity_type': 'Run', 'distance': 5700, 'start_date': '2026-07-30T19:15:42Z'},
-            {'activity_type': 'Run', 'distance': 5400, 'start_date': '2026-07-28T18:59:09Z'},
-            {'activity_type': 'WeightTraining', 'distance': 0, 'start_date': '2026-08-01T13:59:14Z'},
-            {'activity_type': 'WeightTraining', 'distance': 0, 'start_date': '2026-07-29T04:56:47Z'},
+            # The week opens on Monday with a single 6.4km run.
+            {'activity_type': 'Run', 'distance': 6420, 'start_date': day(0)},
+            # Previous week (Tue..Sun): 4 runs totalling 26.5km, plus 2 strength sessions.
+            {'activity_type': 'Run', 'distance': 8579, 'start_date': day(-1)},
+            {'activity_type': 'Run', 'distance': 6796, 'start_date': day(-2)},
+            {'activity_type': 'Run', 'distance': 5700, 'start_date': day(-4)},
+            {'activity_type': 'Run', 'distance': 5400, 'start_date': day(-6)},
+            {'activity_type': 'WeightTraining', 'distance': 0, 'start_date': day(-2)},
+            {'activity_type': 'WeightTraining', 'distance': 0, 'start_date': day(-5)},
         ]
         out = format_weekly_breakdown(activities)
 
@@ -86,7 +92,7 @@ class TestWeeklyBreakdownIsIsoWeekNotRolling:
     def test_full_timestamps_are_accepted(self):
         """coach_generator passes full ISO timestamps, not YYYY-MM-DD."""
         activities = [
-            {'activity_type': 'Run', 'distance': 10000, 'start_date': '2026-08-03T17:21:26Z'},
+            {'activity_type': 'Run', 'distance': 10000, 'start_date': _iso(_relative_monday(1))},
         ]
         assert '10.0km' in format_weekly_breakdown(activities)
 
@@ -560,10 +566,11 @@ class TestWeeklyFieldsDoNotOverlap:
         """Documents the permissive default: a caller that forgets the third
         argument gets the overlap back, silently. Only the handler path is safe."""
         import json as _json
-        items = [{'activity_id': 'a1', 'created_at': '2026-08-03T17:21:26Z',
+        when = _iso(_relative_monday(1))
+        items = [{'activity_id': 'a1', 'created_at': when,
                   'activity_data_json': _json.dumps({
                       'type': 'Run', 'distance': 6420, 'moving_time': 2402,
-                      'start_date': '2026-08-03T17:21:26Z'})}]
+                      'start_date': when})}]
         table = MagicMock()
         table.query.return_value = {'Items': items}
         table.get_item.return_value = {'Item': {}}
