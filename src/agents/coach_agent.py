@@ -18,7 +18,7 @@ from embedded_prompts import COACH_AGENT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-5")
 REGION = os.environ.get("AWS_REGION", "eu-west-1")
 MEMORY_ID = os.environ.get("BEDROCK_AGENTCORE_MEMORY_ID")
 

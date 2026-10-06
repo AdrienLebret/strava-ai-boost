@@ -114,7 +114,7 @@ class ContentGenerationStack(Stack):
         )
 
         # Add permissions for Bedrock access (scoped to specific models via inference profiles)
-        # @secure_recommendation: least privilege — only Sonnet 4.5 + Haiku 4.5 (models used by content_gen and campus_coach)
+        # @secure_recommendation: least privilege — only Sonnet 5 + Haiku 4.5 (models used by content_gen and campus_coach)
         content_lambda_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,

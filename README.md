@@ -76,7 +76,7 @@ export AWS_REGION=eu-west-1
 ./scripts/configure_strava_webhook.sh dev --auto-configure
 ```
 
-**What this deploys**: 8 CDK stacks, DynamoDB tables, 18 Lambda functions (grouped in role-based packages), Step Functions (parallel execution), Secrets Manager, Bedrock fallback mode (Claude Sonnet 4.5), structured logging with AWS Lambda Powertools, CloudFront-hosted frontend with Cognito authentication (User Pool). System is immediately functional. The conversational coach chat runs on a dedicated AgentCore Runtime (deployed separately in Phase 2).
+**What this deploys**: 8 CDK stacks, DynamoDB tables, 18 Lambda functions (grouped in role-based packages), Step Functions (parallel execution), Secrets Manager, Bedrock fallback mode (Claude Sonnet 5), structured logging with AWS Lambda Powertools, CloudFront-hosted frontend with Cognito authentication (User Pool). System is immediately functional. The conversational coach chat runs on a dedicated AgentCore Runtime (deployed separately in Phase 2).
 
 ### Phase 2: AgentCore Enhancement (Optional)
 
@@ -181,7 +181,7 @@ tools to fetch your real activity data on demand and streams the answer
 over Server-Sent Events.
 
 - **Backend**: a dedicated **AgentCore Runtime** (`coach_chat`) — a FastAPI app
-  running a Strands agent (Claude Sonnet 4.5) with the AGUI protocol. The agent
+  running a Strands agent (Claude Sonnet 5) with the AGUI protocol. The agent
   exposes 5 tools (`query_activities`, `get_campus_plan`, `get_pace_zones`,
   `get_intervals_metrics`, `get_coach_observations`) and runs the tool loop server-side, so it retrieves
   exactly the data a question needs instead of relying on a fixed context dump.
@@ -319,7 +319,7 @@ graph TB
         RTChat[Runtime coach_chat<br/>AG-UI, customJWT, 5 tools]
         Memory[Memory content_gen_mem<br/>3 Strategies: Semantic,<br/>UserPreference, Episodic]
         Evals[Evaluations<br/>Built-ins + 2 Custom Judges]
-        Bedrock[Claude Sonnet 4.5 + Haiku 4.5<br/>Central Model Registry]
+        Bedrock[Claude Sonnet 5 + Haiku 4.5<br/>Central Model Registry]
     end
 
     subgraph "External Services"
@@ -405,9 +405,9 @@ sequenceDiagram
 
 **Infrastructure**: AWS CDK (Python), Python 3.12, us-east-1 (configurable via `--context region=<region>`)
 
-**AWS Services**: Lambda (18 functions, Powertools), DynamoDB (4 tables, 2 GSIs, TTL), Step Functions, SQS + DLQ, Bedrock (Claude Sonnet 4.5), Secrets Manager, API Gateway (Cognito authorizer), CloudFront + S3 (OAC), Cognito User Pool
+**AWS Services**: Lambda (18 functions, Powertools), DynamoDB (4 tables, 2 GSIs, TTL), Step Functions, SQS + DLQ, Bedrock (Claude Sonnet 5), Secrets Manager, API Gateway (Cognito authorizer), CloudFront + S3 (OAC), Cognito User Pool
 
-**AI/ML**: Strands Agents, AgentCore Memory (1 shared LTM memory, 3 strategies), AgentCore Evaluations (prompt regression), Claude Sonnet 4.5 + Haiku 4.5 (central model registry)
+**AI/ML**: Strands Agents, AgentCore Memory (1 shared LTM memory, 3 strategies), AgentCore Evaluations (prompt regression), Claude Sonnet 5 + Haiku 4.5 (central model registry)
 
 ### Performance Targets
 

@@ -18,10 +18,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCAN_DIRS = ["lambda_functions", "src", "stacks", "scripts", "tests/regression/evaluators_managed"]
 SCAN_SUFFIXES = {".py", ".sh", ".json", ".yaml", ".yml"}
 
-# Matches Bedrock model ids like global.anthropic.claude-sonnet-4-5-20250929-v1:0
+# Matches Bedrock model ids, both dated/versioned ones
+# (global.anthropic.claude-haiku-4-5-20251001-v1:0) and the newer version-less
+# Anthropic ids (global.anthropic.claude-sonnet-5). Without the second branch
+# the guard would be blind to a stale version-less literal.
 MODEL_ID_RE = re.compile(
-    r"\b(?:global\.|us\.|eu\.|apac\.)?(?:anthropic|amazon|meta|mistral|cohere)\."
-    r"[a-z0-9][a-z0-9.-]*-v\d+(?::\d+)?\b"
+    r"\b(?:global\.|us\.|eu\.|apac\.)?(?:"
+    r"(?:anthropic|amazon|meta|mistral|cohere)\.[a-z0-9][a-z0-9.-]*-v\d+(?::\d+)?"
+    r"|anthropic\.claude-[a-z0-9][a-z0-9.-]*[a-z0-9]"
+    r")\b"
 )
 
 

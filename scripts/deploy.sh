@@ -402,7 +402,7 @@ echo "  ✅ API Gateway: Local interface endpoints"
 
 print_status ""
 print_status "🤖 Content Generation System Status:"
-echo "  ✅ Mode: Bedrock fallback (direct Claude Sonnet 4.5)"
+echo "  ✅ Mode: Bedrock fallback (direct Claude Sonnet 5)"
 echo "  ✅ Features: Smart prompts, module insights, reliable performance"
 echo "  💡 Note: System is fully functional - AgentCore is optional for enhanced features"
 
@@ -515,7 +515,7 @@ print_status "Account: $ACCOUNT_ID"
 
 echo ""
 print_status "🤖 Content Generation System:"
-echo "  ✅ Mode: Bedrock fallback (direct Claude Sonnet 4.5)"
+echo "  ✅ Mode: Bedrock fallback (direct Claude Sonnet 5)"
 echo "  ✅ Features: Smart prompts, module insights, reliable performance"
 echo "  💡 Note: System is fully functional - AgentCore is optional for enhanced features"
 

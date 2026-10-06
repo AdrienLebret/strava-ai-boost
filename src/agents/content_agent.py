@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 
 # Environment variables
 REGION = os.getenv("AWS_REGION", "eu-west-1")
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
+MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-5")
 
 # AgentCore Memory configuration
 MEMORY_ID = os.getenv("BEDROCK_AGENTCORE_MEMORY_ID")

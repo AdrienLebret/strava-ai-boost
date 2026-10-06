@@ -12,7 +12,7 @@ hardcode a model ID in a Lambda.
 import os
 
 # Keep in sync with src/config/llm_config.py DEFAULT_* constants.
-DEFAULT_SONNET_MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+DEFAULT_SONNET_MODEL_ID = "global.anthropic.claude-sonnet-5"
 DEFAULT_HAIKU_MODEL_ID = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
