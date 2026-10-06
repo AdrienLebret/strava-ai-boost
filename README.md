@@ -150,9 +150,12 @@ Enable it:
    Without `push_enabled` nothing push-related is synthesized (no stack, secret, route
    or permission). To keep it on for later deploys, put both keys in the `context`
    block of `cdk.json`.
-3. **Seed the VAPID key pair** (one-off, after the Push stack exists). It stores the
-   pair in Secrets Manager and copies the public key to the SSM parameter
-   `/strava-ai-boost/push/vapid-public-key`; the private key is never printed:
+3. **Seed the VAPID key pair** (one-off, after the Push stack exists, with your own
+   operator credentials). It stores the pair in Secrets Manager and copies the
+   browser half of it, the *application server key* (W3C `applicationServerKey`), to
+   the SSM **SecureString** `/strava-ai-boost/push/vapid-application-server-key`
+   (AWS managed key `aws/ssm`, standard tier, tagged). The signing key is never
+   printed:
    ```bash
    python scripts/bootstrap_vapid.py --apply --profile <your-aws-profile> --region us-east-1
    ```
@@ -162,14 +165,22 @@ Enable it:
    On **iOS**, Web Push only works once the PWA has been **Added to Home Screen**.
 
 Routes (served by `StravaAIBoost-PushApi`, all Cognito-protected):
-`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/subscribe`
-(endpoint required: it removes this device only). PushApi reads only the public-key
-parameter; only `StravaAIBoost-PushSend` can read the VAPID secret. Subscriptions live
-in `strava-ai-boost-push-subscriptions`; PushSend delivers and cleans up expired
-(404/410) endpoints. A notification is sent only when Strava was actually updated, and
-a failed dispatch is retried on the next run. No health data or metric is ever placed
-in a notification payload. `scripts/uninstall.sh` removes the Push stack, the VAPID
-secret and the public-key parameter.
+`GET /push/application-server-key`, `POST /push/subscribe`, `DELETE /push/subscribe`
+(endpoint required: it removes this device only).
+
+Access, least privilege:
+- Only `StravaAIBoost-PushSend` can read the VAPID secret (it signs the VAPID JWT).
+- `StravaAIBoost-PushApi` has no Secrets Manager access. It gets `ssm:GetParameter`
+  on the single application-server-key parameter, nothing else; `aws/ssm` decrypts it
+  through SSM without a `kms:Decrypt` grant. Nothing in the stacks can write that
+  parameter: its integrity matters, since a substituted value would bind new
+  subscriptions to another server. Reads are logged in CloudTrail (management events).
+
+Subscriptions live in `strava-ai-boost-push-subscriptions`; PushSend delivers and
+cleans up expired (404/410) endpoints. A notification is sent only when Strava was
+actually updated, and a failed dispatch is retried on the next run. No health data or
+metric is ever placed in a notification payload. `scripts/uninstall.sh` removes the
+Push stack, the VAPID secret and the SSM parameter.
 
 ---
 
